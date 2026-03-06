@@ -1,0 +1,33 @@
+# 数据库配置
+database:
+  host: "x.x.x.x"
+  port: 3306
+  user: "root"
+  password: "root"
+  dbname: "xxx"
+  charset: "utf8mb4"
+  parseTime: true
+  loc: "Local"
+  timeout: "10s"
+  readTimeout: "10s"
+  writeTimeout: "10s"
+
+# Elasticsearch 配置
+elasticsearch:
+  url: "http://x.x.x.x:9200"
+  sniff: false
+
+# 服务器配置
+server:
+  port: 8080
+  mode: "debug"  # debug, release
+
+# 索引配置
+index:
+  manuscripts: "xxx"
+  syncInfo: "xxx"
+
+# 数据库表配置
+table:
+  manuscript: "xxx"
+  journal: "xxx"

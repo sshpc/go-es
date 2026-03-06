@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>文章搜索</title>
+    <style>
+        .search-container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .search-form {
+            display: flex;
+            margin-bottom: 30px;
+        }
+        .search-input {
+            flex: 1;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px 0 0 4px;
+            outline: none;
+        }
+        .search-btn {
+            padding: 3px 12px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 0 4px 4px 0;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .search-btn:hover {
+            background: #45a049;
+        }
+        .search-results {
+            margin-top: 20px;
+        }
+        .result-item {
+            padding: 15px;
+            margin-bottom: 15px;
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .result-number {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .result-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .result-description {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.5;
+        }
+        .highlight {
+            color: #ff0000;
+            font-weight: bold;
+        }
+        .no-results {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            margin-top: 30px;
+            list-style: none;
+            padding: 0;
+        }
+        .pagination li {
+            margin: 0 5px;
+        }
+        .pagination li a {
+            display: block;
+            padding: 8px 16px;
+            text-decoration: none;
+            color: #333;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .pagination li a:hover {
+            background: #f5f5f5;
+        }
+        .pagination li.active a {
+            background: #4CAF50;
+            color: white;
+            border-color: #4CAF50;
+        }
+        .pagination li.disabled a {
+            color: #999;
+            background: #f9f9f9;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+
+<body>
+
+        <div class="search-container">
+            <h2>文章搜索</h2>
+            <div style="margin-bottom: 20px;">
+                <button id="syncBtn" class="search-btn" style="margin-right: 10px;">同步数据</button>
+                <span id="syncStatus" style="color: #666;"></span>
+            </div>
+            <div style="margin-bottom: 20px; color: #666;">
+                上次同步时间：{{.lastSyncTime}}
+            </div>
+            <form class="search-form" id="searchForm">
+                <input type="text" class="search-input" id="keyword" placeholder="请输入文章标题或内容关键词" />
+                <button type="submit" class="search-btn">搜索</button>
+            </form>
+            
+            <!-- 搜索结果 -->
+            <div class="search-results" id="searchResults">
+            </div>
+        </div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+$(document).ready(function() {
+    var searchParams = {
+        keyword: '',
+        page: 1,
+        limit: 20
+    };
+
+    // 同步数据功能
+    $('#syncBtn').on('click', function() {
+        $(this).attr('disabled', true);
+        $('#syncStatus').text('数据同步中...');
+        
+        $.ajax({
+            url: '/syncManuscripts',
+            type: 'POST',
+            dataType: 'json',
+            success: function(response) {
+                if (response.code == 1) {
+                    $('#syncStatus').text('数据同步成功，共同步 ' + response.data.total + ' 条记录');
+                    location.reload();
+                } else {
+                    $('#syncStatus').text('数据同步失败：' + response.msg);
+                }
+                $('#syncBtn').attr('disabled', false);
+            },
+            error: function() {
+                $('#syncStatus').text('数据同步失败，请稍后重试');
+                $('#syncBtn').attr('disabled', false);
+            }
+        });
+    });
+
+    // 搜索功能
+    $('#searchForm').on('submit', function(e) {
+        e.preventDefault();
+        var keyword = $('#keyword').val().trim();
+        
+        if (!keyword) {
+            alert('请输入搜索关键词');
+            return;
+        }
+        
+        searchParams.keyword = keyword;
+        searchParams.page = 1;
+        
+        performSearch();
+    });
+
+    // 执行搜索
+    function performSearch() {
+        $('#searchResults').html('<div class="loading">搜索中...</div>');
+        
+        $.ajax({
+            url: '/search',
+            type: 'POST',
+            data: searchParams,
+            dataType: 'json',
+            success: function(response) {
+                if (response.code == 1) {
+                    var results = response.data;
+                    var html = '';
+                    
+                    if (results.length > 0) {
+                        html += '<h3>搜索结果 (' + response.total + ')</h3>';
+                        $.each(results, function(index, result) {
+                            html += '<div class="result-item">';
+                            html += '<div class="result-number">文章编号: ' + result.number + '</div>';
+                            html += '<div class="result-title">';
+                            if (result.url) {
+                                html += '<a href="' + result.url + '" target="_blank">' + result.title + '</a>';
+                            } else {
+                                html += result.title;
+                            }
+                            html += '</div>';
+                            html += '<div class="result-description">' + result.description + '</div>';
+                            html += '</div>';
+                        });
+                        
+                        // 生成分页控件
+                        html += generatePagination(response.total, response.page, response.limit);
+                    } else {
+                        html += '<div class="no-results">未找到相关文章</div>';
+                    }
+                    
+                    $('#searchResults').html(html);
+                    
+                    bindPaginationEvents();
+                } else {
+                    $('#searchResults').html('<div class="no-results">' + response.msg + '</div>');
+                }
+            },
+            error: function() {
+                $('#searchResults').html('<div class="no-results">搜索失败，请稍后重试</div>');
+            }
+        });
+    }
+
+    // 生成分页控件
+    function generatePagination(total, currentPage, limit) {
+        var totalPages = Math.ceil(total / limit);
+        var html = '<ul class="pagination">';
+        
+        var prevDisabled = currentPage == 1 ? 'disabled' : '';
+        html += '<li class="' + prevDisabled + '"><a data-page="' + (currentPage - 1) + '">上一页</a></li>';
+        
+        var startPage = Math.max(1, currentPage - 2);
+        var endPage = Math.min(totalPages, startPage + 4);
+        
+        for (var i = startPage; i <= endPage; i++) {
+            var active = i == currentPage ? 'active' : '';
+            html += '<li class="' + active + '"><a data-page="' + i + '">' + i + '</a></li>';
+        }
+        
+        var nextDisabled = currentPage == totalPages ? 'disabled' : '';
+        html += '<li class="' + nextDisabled + '"><a data-page="' + (currentPage + 1) + '">下一页</a></li>';
+        
+        html += '</ul>';
+        return html;
+    }
+
+    // 绑定分页按钮事件
+    function bindPaginationEvents() {
+        $('.pagination li a').on('click', function() {
+            var $li = $(this).parent();
+            if ($li.hasClass('disabled') || $li.hasClass('active')) {
+                return;
+            }
+            
+            var page = parseInt($(this).data('page'));
+            searchParams.page = page;
+            performSearch();
+        });
+    }
+});
+</script>
+
+</body>
+
+</html>
